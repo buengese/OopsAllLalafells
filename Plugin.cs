@@ -11,6 +11,8 @@ namespace OopsAllLalafells
     {
         private DalamudPluginInterface pluginInterface;
 
+        private const uint CHARA_WINDOW_ACTOR_ID = 0xE0000000;
+
         private const int LALAFELL_RACE_ID = 3;
         private const int LALAFELL_CLAN_OFFSET = 5;
 
@@ -46,7 +48,8 @@ namespace OopsAllLalafells
 
                 if (actor == null
                     || actor.ObjectKind != ObjectKind.Player
-                    || actor.ActorId == localPlayer.ActorId)
+                    || actor.ActorId == localPlayer.ActorId
+                    || (uint) actor.ActorId == CHARA_WINDOW_ACTOR_ID)
                 {
                     continue;
                 }
