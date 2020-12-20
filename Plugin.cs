@@ -21,6 +21,11 @@ namespace OopsAllLalafells
         private const int OFFSET_RENDER_TOGGLE = 0x104;
         private const int OFFSET_MODEL_TYPE = 0x1B4;
 
+        private const int OFFSET_CHEST = 0x1044;
+        private const int OFFSET_ARMS = 0x1048;
+        private const int OFFSET_LEGS = 0x104C;
+        private const int OFFSET_FEET = 0x1050;
+
         public string Name => "Oops, All Lalafells!";
 
 #if DEBUG
@@ -94,6 +99,9 @@ namespace OopsAllLalafells
                         // Assign a Lalafell clan deterministically based on their current clan ID
                         Marshal.WriteByte(addrClan, (byte) ((currentClan % 2) + LALAFELL_CLAN_OFFSET));
 
+                        // Map any race-specific gear appropriately to Lalafellin gear
+                        MapRacialGear(a);
+
                         // Trigger a re-render
                         Marshal.WriteInt32(addrRenderToggle, 2);
                         await Task.Delay(100);
@@ -106,6 +114,38 @@ namespace OopsAllLalafells
                 }
             });
         }
+
+        private void MapRacialGear(Dalamud.Game.ClientState.Actors.Types.Actor a)
+        {
+            Marshal.WriteInt16(a.Address + OFFSET_CHEST, MapRacialEquipModelId(Marshal.ReadInt16(a.Address + OFFSET_CHEST)));
+            Marshal.WriteInt16(a.Address + OFFSET_ARMS, MapRacialEquipModelId(Marshal.ReadInt16(a.Address + OFFSET_ARMS)));
+            Marshal.WriteInt16(a.Address + OFFSET_LEGS, MapRacialEquipModelId(Marshal.ReadInt16(a.Address + OFFSET_LEGS)));
+            Marshal.WriteInt16(a.Address + OFFSET_FEET, MapRacialEquipModelId(Marshal.ReadInt16(a.Address + OFFSET_FEET)));
+        }
+
+        private short MapRacialEquipModelId(short input)
+        {
+            switch (input)
+            {
+                // Male
+                case 84: // Hyur
+                case 86: // Elezen
+                case 88: // Miqo
+                case 90: // Roe
+                case 597: // Hrothgar
+                    return 92;
+                // Female
+                case 85: // Hyur
+                case 87: // Elezen
+                case 89: // Miqo
+                case 91: // Roe
+                case 581: // Viera
+                    return 93;
+            }
+
+            return input;
+        }
+
         #region IDisposable Support
         protected virtual void Dispose(bool disposing)
         {
