@@ -132,6 +132,7 @@ namespace OopsAllLalafells
                 case 86: // Elezen
                 case 88: // Miqo
                 case 90: // Roe
+                case 257: // Au Ra
                 case 597: // Hrothgar
                     return 92;
                 // Female
@@ -139,6 +140,7 @@ namespace OopsAllLalafells
                 case 87: // Elezen
                 case 89: // Miqo
                 case 91: // Roe
+                case 258: // Au Ra
                 case 581: // Viera
                     return 93;
             }
