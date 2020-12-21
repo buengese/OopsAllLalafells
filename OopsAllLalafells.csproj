@@ -3,9 +3,10 @@
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
     <LangVersion>8.0</LangVersion>
-    <AssemblyVersion>1.0.2.1</AssemblyVersion>
-    <FileVersion>1.0.2.1</FileVersion>
+    <AssemblyVersion>1.0.2.2</AssemblyVersion>
+    <FileVersion>1.0.2.2</FileVersion>
     <Version>1.0.2.1</Version>
+    <PackageVersion>1.0.2.2</PackageVersion>
   </PropertyGroup>
 
   <ItemGroup>

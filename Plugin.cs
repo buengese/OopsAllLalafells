@@ -21,6 +21,9 @@ namespace OopsAllLalafells
         private const int OFFSET_RENDER_TOGGLE = 0x104;
         private const int OFFSET_MODEL_TYPE = 0x1B4;
 
+        private const int OFFSET_BODY_TYPE = 0x187A;
+        private const int OFFSET_HEAD_TYPE = 0x187D;
+        
         private const int OFFSET_CHEST = 0x1044;
         private const int OFFSET_ARMS = 0x1048;
         private const int OFFSET_LEGS = 0x104C;
@@ -100,7 +103,7 @@ namespace OopsAllLalafells
                         Marshal.WriteByte(addrClan, (byte) ((currentClan % 2) + LALAFELL_CLAN_OFFSET));
 
                         // Map any race-specific gear appropriately to Lalafellin gear
-                        MapRacialGear(a);
+                        MapRacialSpecifics(a);
 
                         // Trigger a re-render
                         Marshal.WriteInt32(addrRenderToggle, 2);
@@ -115,12 +118,19 @@ namespace OopsAllLalafells
             });
         }
 
-        private void MapRacialGear(Dalamud.Game.ClientState.Actors.Types.Actor a)
+        private void MapRacialSpecifics(Dalamud.Game.ClientState.Actors.Types.Actor a)
         {
+            // Race-specific starter gear needs to be mapped so as to not be invisible
             Marshal.WriteInt16(a.Address + OFFSET_CHEST, MapRacialEquipModelId(Marshal.ReadInt16(a.Address + OFFSET_CHEST)));
             Marshal.WriteInt16(a.Address + OFFSET_ARMS, MapRacialEquipModelId(Marshal.ReadInt16(a.Address + OFFSET_ARMS)));
             Marshal.WriteInt16(a.Address + OFFSET_LEGS, MapRacialEquipModelId(Marshal.ReadInt16(a.Address + OFFSET_LEGS)));
             Marshal.WriteInt16(a.Address + OFFSET_FEET, MapRacialEquipModelId(Marshal.ReadInt16(a.Address + OFFSET_FEET)));
+            
+            // Head type needs to be constrained to 0-3 so as to not decapitate the character
+            Marshal.WriteByte(a.Address + OFFSET_HEAD_TYPE, (byte) (Marshal.ReadByte(a.Address + OFFSET_HEAD_TYPE) % 4));
+            
+            // Body type needs to be constrained to 0-1 so as to not entirely crash the game
+            Marshal.WriteByte(a.Address + OFFSET_BODY_TYPE, (byte) (Marshal.ReadByte(a.Address + OFFSET_BODY_TYPE) % 2));
         }
 
         private short MapRacialEquipModelId(short input)
