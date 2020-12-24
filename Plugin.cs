@@ -2,8 +2,9 @@
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Dalamud.Game.ClientState.Actors;
-using Dalamud.Game.Internal;
+using Dalamud.Game.ClientState.Actors.Types;
 using Dalamud.Plugin;
+using Dalamud.Hooking;
 
 namespace OopsAllLalafells
 {
@@ -14,35 +15,67 @@ namespace OopsAllLalafells
         private const uint CHARA_WINDOW_ACTOR_ID = 0xE0000000;
 
         private const int LALAFELL_RACE_ID = 3;
-        private const int LALAFELL_CLAN_OFFSET = 5;
+        private const int LALAFELL_CLAN_OFFSET = 6;
 
-        private const int OFFSET_RACE = 0x1878;
-        private const int OFFSET_CLAN = 0x187C;
         private const int OFFSET_RENDER_TOGGLE = 0x104;
-        private const int OFFSET_MODEL_TYPE = 0x1B4;
-
-        private const int OFFSET_BODY_TYPE = 0x187A;
-        private const int OFFSET_HEAD_TYPE = 0x187D;
-        
-        private const int OFFSET_CHEST = 0x1044;
-        private const int OFFSET_ARMS = 0x1048;
-        private const int OFFSET_LEGS = 0x104C;
-        private const int OFFSET_FEET = 0x1050;
 
         public string Name => "Oops, All Lalafells!";
 
-#if DEBUG
-        private int renderCycle = 0;
-#endif
+        private delegate IntPtr CharacterInitialize(IntPtr actorPtr, IntPtr customizeDataPtr);
+
+        private delegate IntPtr FlagSlotUpdate(IntPtr actorPtr, uint slot, IntPtr equipData);
+
+        private Hook<CharacterInitialize> charaInitHook;
+        private Hook<FlagSlotUpdate> flagSlotUpdateHook;
 
         public void Initialize(DalamudPluginInterface pluginInterface)
         {
             this.pluginInterface = pluginInterface;
+            
+            var charaInitAddr = this.pluginInterface.TargetModuleScanner.ScanText("E8 ?? ?? ?? ?? 48 8B 0D ?? ?? ?? ?? 48 8B D7 E8 ?? ?? ?? ?? 48 8B CF E8 ?? ?? ?? ?? 48 8B C7");
+            PluginLog.Log($"Found Initialize sig: {charaInitAddr.ToInt64():X}");
+            
+            this.charaInitHook ??= new Hook<CharacterInitialize>(charaInitAddr, new CharacterInitialize(CharacterInitializeDetour));
+            this.charaInitHook.Enable();
+            
+            var flagSlotUpdateHook = this.pluginInterface.TargetModuleScanner.ScanText("48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 8B DA 49 8B F0 48 8B F9 83 FA 0A");
+            PluginLog.Log($"Found FlagSlotUpdate sig: {flagSlotUpdateHook.ToInt64():X}");
 
-            this.pluginInterface.Framework.OnUpdateEvent += RenderActors;
+            this.flagSlotUpdateHook ??=
+                new Hook<FlagSlotUpdate>(flagSlotUpdateHook, new FlagSlotUpdate(FlagSlotUpdateDetour));
+            this.flagSlotUpdateHook.Enable();
+            
+            // Trigger an initial refresh of all players
+            RefreshAllPlayers();
         }
 
-        private void RenderActors(Framework framework)
+        private IntPtr CharacterInitializeDetour(IntPtr actorPtr, IntPtr customizeDataPtr)
+        {
+            var customizeData = Marshal.PtrToStructure<CharaCustomizeData>(customizeDataPtr);
+
+            customizeData.race = LALAFELL_RACE_ID;
+            customizeData.clan = (byte) (LALAFELL_CLAN_OFFSET - customizeData.clan % 2);
+
+            // Constrain face type to 0-3 so we don't decapitate the character
+            customizeData.faceType %= 4;
+            
+            // Constrain body type to 0-1 so we don't crash the game
+            customizeData.bodyType %= 2;
+            
+            Marshal.StructureToPtr(customizeData, customizeDataPtr, true);
+            return charaInitHook.Original(actorPtr, customizeDataPtr);
+        }
+
+        private IntPtr FlagSlotUpdateDetour(IntPtr actorPtr, uint slot, IntPtr equipDataPtr)
+        {
+            var equipData = Marshal.PtrToStructure<EquipData>(equipDataPtr);
+            equipData = MapRacialModelEquip(equipData);
+            
+            Marshal.StructureToPtr(equipData, equipDataPtr, true);
+            return flagSlotUpdateHook.Original(actorPtr, slot, equipDataPtr);
+        }
+
+        private void RefreshAllPlayers()
         {
             var localPlayer = this.pluginInterface.ClientState.LocalPlayer;
             if (localPlayer == null)
@@ -50,66 +83,28 @@ namespace OopsAllLalafells
                 return;
             }
 
-            for (var k = 0; k < this.pluginInterface.ClientState.Actors.Length; k++)
+            for (var i = 0; i < this.pluginInterface.ClientState.Actors.Length; i++)
             {
-                var actor = this.pluginInterface.ClientState.Actors[k];
-
-                if (actor == null
-                    || actor.ObjectKind != ObjectKind.Player
-                    || actor.ActorId == localPlayer.ActorId
-                    || (uint) actor.ActorId == CHARA_WINDOW_ACTOR_ID)
+                var actor = this.pluginInterface.ClientState.Actors[i];
+                
+                if (actor != null && actor.ObjectKind == ObjectKind.Player)
                 {
-                    continue;
+                    RerenderActor(actor);
                 }
-
-                RerenderActor(actor);
             }
-
-#if DEBUG
-            renderCycle++;
-#endif
         }
 
-        private async void RerenderActor(Dalamud.Game.ClientState.Actors.Types.Actor a)
+        private async void RerenderActor(Actor actor)
         {
             await Task.Run(async () => {
                 try
                 {
-                    var addrRace = a.Address + OFFSET_RACE;
-                    var addrClan = a.Address + OFFSET_CLAN;
-                    var addrRenderToggle = a.Address + OFFSET_RENDER_TOGGLE;
-                    var addrModelType = a.Address + OFFSET_MODEL_TYPE;
-
-                    // Allow for compatibility with other plugins that may modify character models
-                    int modelType = Marshal.ReadInt32(addrModelType, 0);
-                    if (modelType != 0)
-                    {
-#if DEBUG
-                        if (renderCycle % 300 == 0)
-                        {
-                            PluginLog.Log("Skipping invalid actor: modelType {0}, name {1} (distance: x {2} yalms, y {3} yalms)", modelType, a.Name, a.YalmDistanceX, a.YalmDistanceY);
-                        }
-#endif
-                        return;
-                    }
-
-                    byte currentRace = Marshal.ReadByte(addrRace, 0);
-                    if (currentRace != LALAFELL_RACE_ID)
-                    {
-                        Marshal.WriteByte(addrRace, LALAFELL_RACE_ID);
-
-                        byte currentClan = Marshal.ReadByte(addrClan, 0);
-                        // Assign a Lalafell clan deterministically based on their current clan ID
-                        Marshal.WriteByte(addrClan, (byte) ((currentClan % 2) + LALAFELL_CLAN_OFFSET));
-
-                        // Map any race-specific gear appropriately to Lalafellin gear
-                        MapRacialSpecifics(a);
-
-                        // Trigger a re-render
-                        Marshal.WriteInt32(addrRenderToggle, 2);
-                        await Task.Delay(100);
-                        Marshal.WriteInt32(addrRenderToggle, 0);
-                    }
+                    var addrRenderToggle = actor.Address + OFFSET_RENDER_TOGGLE;
+                    
+                    // Trigger a rerender
+                    Marshal.WriteInt32(addrRenderToggle, 2);
+                    await Task.Delay(100);
+                    Marshal.WriteInt32(addrRenderToggle, 0);
                 }
                 catch (Exception ex)
                 {
@@ -118,24 +113,9 @@ namespace OopsAllLalafells
             });
         }
 
-        private void MapRacialSpecifics(Dalamud.Game.ClientState.Actors.Types.Actor a)
+        private EquipData MapRacialModelEquip(EquipData eq)
         {
-            // Race-specific starter gear needs to be mapped so as to not be invisible
-            Marshal.WriteInt16(a.Address + OFFSET_CHEST, MapRacialEquipModelId(Marshal.ReadInt16(a.Address + OFFSET_CHEST)));
-            Marshal.WriteInt16(a.Address + OFFSET_ARMS, MapRacialEquipModelId(Marshal.ReadInt16(a.Address + OFFSET_ARMS)));
-            Marshal.WriteInt16(a.Address + OFFSET_LEGS, MapRacialEquipModelId(Marshal.ReadInt16(a.Address + OFFSET_LEGS)));
-            Marshal.WriteInt16(a.Address + OFFSET_FEET, MapRacialEquipModelId(Marshal.ReadInt16(a.Address + OFFSET_FEET)));
-            
-            // Head type needs to be constrained to 0-3 so as to not decapitate the character
-            Marshal.WriteByte(a.Address + OFFSET_HEAD_TYPE, (byte) (Marshal.ReadByte(a.Address + OFFSET_HEAD_TYPE) % 4));
-            
-            // Body type needs to be constrained to 0-1 so as to not entirely crash the game
-            Marshal.WriteByte(a.Address + OFFSET_BODY_TYPE, (byte) (Marshal.ReadByte(a.Address + OFFSET_BODY_TYPE) % 2));
-        }
-
-        private short MapRacialEquipModelId(short input)
-        {
-            switch (input)
+            switch (eq.model)
             {
                 // Male
                 case 84: // Hyur
@@ -144,7 +124,9 @@ namespace OopsAllLalafells
                 case 90: // Roe
                 case 257: // Au Ra
                 case 597: // Hrothgar
-                    return 92;
+                    eq.model = 92;
+                    eq.variant = 1;
+                    break;
                 // Female
                 case 85: // Hyur
                 case 87: // Elezen
@@ -152,10 +134,12 @@ namespace OopsAllLalafells
                 case 91: // Roe
                 case 258: // Au Ra
                 case 581: // Viera
-                    return 93;
+                    eq.model = 93;
+                    eq.variant = 1;
+                    break;
             }
 
-            return input;
+            return eq;
         }
 
         #region IDisposable Support
@@ -163,7 +147,15 @@ namespace OopsAllLalafells
         {
             if (!disposing) return;
 
-            this.pluginInterface.Framework.OnUpdateEvent -= RenderActors;
+            this.charaInitHook.Disable();
+            this.flagSlotUpdateHook.Disable();
+            
+            this.charaInitHook.Dispose();
+            this.flagSlotUpdateHook.Dispose();
+            
+            // Refresh all players again
+            RefreshAllPlayers();
+            
             this.pluginInterface.Dispose();
         }
 
