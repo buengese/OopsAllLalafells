@@ -39,7 +39,7 @@ namespace OopsAllLalafells
                 return;
             }
             
-            ImGui.SetNextWindowSize(new Vector2(500, 500), ImGuiCond.Always);
+            // ImGui.SetNextWindowSize(new Vector2(500, 500), ImGuiCond.Always);
 
             bool isOpen = true;
             if (!ImGui.Begin("Oops, All Lalafells!", ref isOpen, ImGuiWindowFlags.NoCollapse))

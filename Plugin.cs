@@ -82,6 +82,7 @@ namespace OopsAllLalafells
 
             this.ui = new PluginUI(this);
             this.pluginInterface.UiBuilder.OnBuildUi += this.ui.Draw;
+            this.pluginInterface.UiBuilder.OnOpenConfigUi += OpenSettingsMenu;
 
             this.commandManager = new PluginCommandManager<Plugin>(this, this.pluginInterface);
 
@@ -132,7 +133,9 @@ namespace OopsAllLalafells
             {
                 var actor = Marshal.PtrToStructure<Actor>(lastActor);
 
-                if ((uint) actor.ActorId != CHARA_WINDOW_ACTOR_ID)
+                if ((uint) actor.ActorId != CHARA_WINDOW_ACTOR_ID
+                    && this.pluginInterface.ClientState.LocalPlayer != null
+                    && actor.ActorId != this.pluginInterface.ClientState.LocalPlayer.ActorId)
                 {
                     var customizeData = Marshal.PtrToStructure<CharaCustomizeData>(customizeDataPtr);
 
@@ -140,7 +143,7 @@ namespace OopsAllLalafells
                     customizeData.race = this.config.TargetRace;
                     customizeData.clan = (byte) (customizeData.race * 2 - customizeData.clan % 2);
 
-                    // Specialcase Hrothgar/Viera gender to prevent fuckery
+                    // Special-case Hrothgar/Viera gender to prevent fuckery
                     customizeData.gender = this.config.TargetRace switch
                     {
                         7 => 0, // Force male for Hrothgar
@@ -156,7 +159,7 @@ namespace OopsAllLalafells
                     customizeData.bodyType %= 2;
 
                     Marshal.StructureToPtr(customizeData, customizeDataPtr, true);
-                    
+
                     // Record the new race/gender for equip model mapping, and mark the equip as dirty
                     lastPlayerRace = customizeData.race;
                     lastPlayerGender = customizeData.gender;
@@ -208,7 +211,9 @@ namespace OopsAllLalafells
             {
                 var actor = this.pluginInterface.ClientState.Actors[i];
 
-                if (actor != null && actor.ObjectKind == ObjectKind.Player)
+                if (actor != null
+                    && actor.ObjectKind == ObjectKind.Player
+                    && actor.ActorId != localPlayer.ActorId)
                 {
                     RerenderActor(actor);
                 }
@@ -217,22 +222,19 @@ namespace OopsAllLalafells
 
         private async void RerenderActor(Dalamud.Game.ClientState.Actors.Types.Actor actor)
         {
-            await Task.Run(async () =>
+            try
             {
-                try
-                {
-                    var addrRenderToggle = actor.Address + OFFSET_RENDER_TOGGLE;
+                var addrRenderToggle = actor.Address + OFFSET_RENDER_TOGGLE;
 
-                    // Trigger a rerender
-                    Marshal.WriteInt32(addrRenderToggle, 2);
-                    await Task.Delay(100);
-                    Marshal.WriteInt32(addrRenderToggle, 0);
-                }
-                catch (Exception ex)
-                {
-                    PluginLog.LogError(ex.ToString());
-                }
-            });
+                // Trigger a rerender
+                Marshal.WriteInt32(addrRenderToggle, 2);
+                await Task.Delay(100);
+                Marshal.WriteInt32(addrRenderToggle, 0);
+            }
+            catch (Exception ex)
+            {
+                PluginLog.LogError(ex.ToString());
+            }
         }
 
         private EquipData MapRacialEquipModels(int race, int gender, EquipData eq)
@@ -253,6 +255,11 @@ namespace OopsAllLalafells
         [HelpMessage("Opens the Oops, All Lalafells! settings menu.")]
         public void OpenSettingsMenuCommand(string command, string args)
         {
+            OpenSettingsMenu(command, args);
+        }
+
+        private void OpenSettingsMenu(object a, object b)
+        {
             this.ui.IsVisible = true;
         }
 
@@ -264,6 +271,7 @@ namespace OopsAllLalafells
 
             this.commandManager.Dispose();
 
+            this.pluginInterface.UiBuilder.OnOpenConfigUi -= OpenSettingsMenu;
             this.pluginInterface.UiBuilder.OnBuildUi -= this.ui.Draw;
             this.pluginInterface.SavePluginConfig(this.config);
 
