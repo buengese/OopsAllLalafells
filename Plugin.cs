@@ -32,10 +32,14 @@ namespace OopsAllLalafells {
 
         private static readonly short[] RACE_STARTER_GEAR_IDS;
 
-
         public string Name => "Oops, All Lalafells!";
         public DalamudPluginInterface pluginInterface { get; private set; }
-        private Configuration config;
+        public Configuration config { get; private set; }
+        private bool unsavedConfigChanges = false;
+
+        private PluginUI ui;
+        public bool SettingsVisible = false;
+
         private PluginCommandManager<Plugin> commandManager;
 
         private delegate IntPtr CharacterIsMounted(IntPtr actor);
@@ -71,9 +75,11 @@ namespace OopsAllLalafells {
             this.pluginInterface = pluginInterface;
 
             this.config = (Configuration)this.pluginInterface.GetPluginConfig() ?? new Configuration();
-            this.config.Initialize(this, pluginInterface);
+            this.config.Initialize(pluginInterface);
 
-            this.pluginInterface.UiBuilder.OnBuildUi += this.config.Draw;
+            this.ui = new PluginUI(this, pluginInterface);
+
+            this.pluginInterface.UiBuilder.OnBuildUi += this.ui.Draw;
             this.pluginInterface.UiBuilder.OnOpenConfigUi += OpenSettingsMenu;
 
             this.commandManager = new PluginCommandManager<Plugin>(this, this.pluginInterface);
@@ -122,17 +128,16 @@ namespace OopsAllLalafells {
 
                 if ((uint)actor.ActorId != CHARA_WINDOW_ACTOR_ID
                     && this.pluginInterface.ClientState.LocalPlayer != null) {
-                    if (actor.ActorId == this.pluginInterface.ClientState.LocalPlayer.ActorId) {
+                    bool isSelf = actor.ActorId == this.pluginInterface.ClientState.LocalPlayer.ActorId;
+                    byte targetRace = isSelf ? this.config.SelfRace : this.config.OtherRace;
+                    this.LogRace(customizeDataPtr, targetRace);
+                    if (isSelf) {
                         if (this.config.SelfChange) {
                             this.ChangeRace(customizeDataPtr, this.config.SelfRace);
-                        } else {
-                            this.LogRace(customizeDataPtr, this.config.OtherRace);
                         }
                     } else {
                         if (this.config.OtherChange) {
                             this.ChangeRace(customizeDataPtr, this.config.OtherRace);
-                        } else {
-                            this.LogRace(customizeDataPtr, this.config.OtherRace);
                         }
                     }
                 }
@@ -142,94 +147,95 @@ namespace OopsAllLalafells {
         }
 
         private void LogRace(IntPtr customizeDataPtr, byte targetRace) {
-#if(DEBUG)
-            var customizeData = Marshal.PtrToStructure<CharaCustomizeData>(customizeDataPtr);
-
-            if (customizeData.race == targetRace) {
-                foreach (CustomizeIndex ndx in Enum.GetValues(typeof(CustomizeIndex))) {
-                    PluginLog.Log($"Existing {ndx} is {Marshal.PtrToStructure<byte>(customizeDataPtr + (int) ndx)}");
-                }
+//#if(DEBUG)
+            var customData = Marshal.PtrToStructure<CharaCustomizeData>(customizeDataPtr);
+            if (customData.Race == targetRace) {
+                PluginLog.Log($"Existing hairStyle is {customData.HairStyle}");
             }
-#endif
+//#endif
         }
 
         private void ChangeRace(IntPtr customizeDataPtr, byte targetRace) {
-            var customizeData = Marshal.PtrToStructure<CharaCustomizeData>(customizeDataPtr);
+            var customData = Marshal.PtrToStructure<CharaCustomizeData>(customizeDataPtr);
 
-            if (customizeData.race != targetRace) {
+            if (customData.Race != targetRace) {
                 // Modify the race/tribe accordingly
-                customizeData.race = targetRace;
-                customizeData.tribe = (byte)(customizeData.race * 2 - customizeData.tribe % 2);
+                customData.Race = targetRace;
+                customData.Tribe = (byte)(customData.Race * 2 - customData.Tribe % 2);
 
                 // Special-case Hrothgar/Viera gender to prevent fuckery
-                customizeData.gender = targetRace switch
-                {
+                customData.Gender = targetRace switch {
                     7 => 0, // Force male for Hrothgar
                     8 => 1, // Force female for Viera
-                    _ => customizeData.gender
+                    _ => customData.Gender
                 };
 
                 // TODO: Re-evaluate these for valid race-specific values? (These are Lalafell values)
                 // Constrain face type to 0-3 so we don't decapitate the character
-                customizeData.faceType %= 4;
+                customData.FaceType %= 4;
 
                 // Constrain body type to 0-1 so we don't crash the game
-                customizeData.modelType %= 2;
+                customData.ModelType %= 2;
 
-                // Constrain skin color to 0-1 so we don't crash the game
-                customizeData.skinColor = targetRace switch
-                {
-                    7 => 9, // Hrothgar can't use 0
-                    _ => (byte)(customizeData.skinColor % 2)
+                // Hrothgar have a limited number of lip colors?
+                customData.LipColor = targetRace switch {
+                    7 => (byte) (customData.LipColor % 5 + 1),
+                    _ => customData.LipColor
                 };
-
-                customizeData.faceType = this.config.FaceType;
-                customizeData.hairColor = this.config.HairColor;
-                customizeData.hairColor2 = this.config.HairColor2;
-                customizeData.hairStyle = this.config.HairStyle;
-                customizeData.bustSize = this.config.BustSize;
-                customizeData.raceFeatureSize = this.config.RaceFeatureSize;
-                customizeData.raceFeatureType = this.config.RaceFeatureType;
-
-                Marshal.StructureToPtr(customizeData, customizeDataPtr, true);
+                
+                // TODO: Get values for other races
+                customData.HairStyle = targetRace switch {
+                    7 => (byte) (customData.HairStyle % 8 + 1), // Hrothgar cap at 7
+                    8 => (byte) (customData.HairStyle % 17 + 1), // Viera cap at 17
+                    _ => customData.LipColor
+                };
+                
+                Marshal.StructureToPtr(customData, customizeDataPtr, true);
 
                 // Record the new race/gender for equip model mapping, and mark the equip as dirty
-                lastPlayerRace = customizeData.race;
-                lastPlayerGender = customizeData.gender;
+                lastPlayerRace = customData.Race;
+                lastPlayerGender = customData.Gender;
                 lastWasModified = true;
-
+#if(DEBUG)
                 foreach (CustomizeIndex ndx in Enum.GetValues(typeof(CustomizeIndex))) {
                     PluginLog.Log($"Modified {ndx} is {Marshal.PtrToStructure<byte>(customizeDataPtr + (int)ndx)}");
                 }
+#endif
             }
         }
 
         private IntPtr FlagSlotUpdateDetour(IntPtr actorPtr, uint slot, IntPtr equipDataPtr) {
             if (lastWasPlayer) {
-                var equipData = Marshal.PtrToStructure<EquipData>(equipDataPtr);
-                LogEquipModels(equipData, !lastWasModified);
+                // LogEquipModels(equipData, !lastWasModified);
                 if (lastWasModified) {
+                    var equipData = Marshal.PtrToStructure<EquipData>(equipDataPtr);
                     equipData = MapRacialEquipModels(lastPlayerRace, lastPlayerGender, equipData);
+                    Marshal.StructureToPtr(equipData, equipDataPtr, true);
                 }
-
-                Marshal.StructureToPtr(equipData, equipDataPtr, true);
             }
 
             return flagSlotUpdateHook.Original(actorPtr, slot, equipDataPtr);
         }
 
-        private EquipData LogEquipModels(EquipData eq, bool correctRace)
-        {
-            if (correctRace)
-            {
+        private EquipData LogEquipModels(EquipData eq, bool correctRace) {
+#if(DEBUG)
+            if (correctRace) {
                 PluginLog.Log($"Modified {eq.model}, {eq.variant}");
-            }
-            else
-            {
+            } else {
                 PluginLog.Log($"Existing {eq.model}, {eq.variant}");
             }
-
+#endif
             return eq;
+        }
+
+        public bool SaveConfig() {
+            if (this.unsavedConfigChanges) {
+                this.config.Save();
+                this.unsavedConfigChanges = false;
+                this.RefreshAllPlayers();
+                return true;
+            }
+            return false;
         }
 
         public void ToggleOtherRace(bool changeRace) {
@@ -239,7 +245,7 @@ namespace OopsAllLalafells {
 
             PluginLog.Log($"OtherRace toggled to {changeRace}, refreshing players");
             this.config.OtherChange = changeRace;
-            RefreshAllPlayers();
+            unsavedConfigChanges = true;
         }
 
         public void UpdateOtherRace(int id) {
@@ -249,7 +255,7 @@ namespace OopsAllLalafells {
 
             PluginLog.Log($"OtherRace changed to {id}, refreshing players");
             this.config.OtherRace = (byte)id;
-            RefreshAllPlayers();
+            unsavedConfigChanges = true;
         }
 
         public void ToggleSelfRace(bool changeRace) {
@@ -259,7 +265,7 @@ namespace OopsAllLalafells {
 
             PluginLog.Log($"SelfRace toggled to {changeRace}, refreshing players");
             this.config.SelfChange = changeRace;
-            RefreshAllPlayers();
+            unsavedConfigChanges = true;
         }
 
         public void UpdateSelfRace(int id) {
@@ -269,7 +275,7 @@ namespace OopsAllLalafells {
 
             PluginLog.Log($"SelfRace changed to {id}, refreshing players");
             this.config.SelfRace = (byte)id;
-            RefreshAllPlayers();
+            unsavedConfigChanges = true;
         }
 
         public void RefreshAllPlayers() {
@@ -320,7 +326,7 @@ namespace OopsAllLalafells {
         }
 
         private void OpenSettingsMenu(object a, object b) {
-            this.config.SettingsVisible = true;
+            this.SettingsVisible = true;
         }
 
         #region IDisposable Support
@@ -331,8 +337,8 @@ namespace OopsAllLalafells {
             this.commandManager.Dispose();
 
             this.pluginInterface.UiBuilder.OnOpenConfigUi -= OpenSettingsMenu;
-            this.pluginInterface.UiBuilder.OnBuildUi -= this.config.Draw;
-            this.pluginInterface.SavePluginConfig(this.config);
+            this.pluginInterface.UiBuilder.OnBuildUi -= this.ui.Draw;
+            this.SaveConfig();
 
             this.charaMountedHook.Disable();
             this.charaInitHook.Disable();
