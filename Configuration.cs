@@ -10,8 +10,8 @@ namespace OopsAllLalafells {
         private DalamudPluginInterface pluginInterface;
 
         public int Version { get; set; } = 1;
-        public byte OtherRace { get; set; } = 3;
-        public byte SelfRace { get; set; } = 3;
+        public Race OtherRace { get; set; } = (Race) 3;
+        public Race SelfRace { get; set; } = (Race) 3;
         public bool OtherChange { get; set; } = false;
         public bool SelfChange { get; set; } = false;
 

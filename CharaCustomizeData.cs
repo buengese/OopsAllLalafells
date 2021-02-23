@@ -4,7 +4,7 @@ using Dalamud.Game.ClientState.Actors;
 namespace OopsAllLalafells {
     [StructLayout((LayoutKind.Explicit))]
     public struct CharaCustomizeData {
-        [FieldOffset((int) CustomizeIndex.Race)] public byte Race;
+        [FieldOffset((int) CustomizeIndex.Race)] public Race Race;
         [FieldOffset((int) CustomizeIndex.Gender)] public byte Gender;
         [FieldOffset((int) CustomizeIndex.ModelType)] public byte ModelType;
         [FieldOffset((int) CustomizeIndex.Height)] public byte Height;

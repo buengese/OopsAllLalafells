@@ -56,7 +56,7 @@ namespace OopsAllLalafells {
         private bool lastWasPlayer;
         private bool lastWasModified;
 
-        private byte lastPlayerRace;
+        private Race lastPlayerRace;
         private byte lastPlayerGender;
 
         // This sucks, but here we are
@@ -129,7 +129,7 @@ namespace OopsAllLalafells {
                 if ((uint)actor.ActorId != CHARA_WINDOW_ACTOR_ID
                     && this.pluginInterface.ClientState.LocalPlayer != null) {
                     bool isSelf = actor.ActorId == this.pluginInterface.ClientState.LocalPlayer.ActorId;
-                    byte targetRace = isSelf ? this.config.SelfRace : this.config.OtherRace;
+                    Race targetRace = isSelf ? this.config.SelfRace : this.config.OtherRace;
                     this.LogRace(customizeDataPtr, targetRace);
                     if (isSelf) {
                         if (this.config.SelfChange) {
@@ -146,7 +146,7 @@ namespace OopsAllLalafells {
             return charaInitHook.Original(drawObjectBase, customizeDataPtr);
         }
 
-        private void LogRace(IntPtr customizeDataPtr, byte targetRace) {
+        private void LogRace(IntPtr customizeDataPtr, Race targetRace) {
 //#if(DEBUG)
             var customData = Marshal.PtrToStructure<CharaCustomizeData>(customizeDataPtr);
             if (customData.Race == targetRace) {
@@ -155,18 +155,18 @@ namespace OopsAllLalafells {
 //#endif
         }
 
-        private void ChangeRace(IntPtr customizeDataPtr, byte targetRace) {
+        private void ChangeRace(IntPtr customizeDataPtr, Race targetRace) {
             var customData = Marshal.PtrToStructure<CharaCustomizeData>(customizeDataPtr);
 
             if (customData.Race != targetRace) {
                 // Modify the race/tribe accordingly
                 customData.Race = targetRace;
-                customData.Tribe = (byte)(customData.Race * 2 - customData.Tribe % 2);
+                customData.Tribe = (byte)((byte) customData.Race * 2 - customData.Tribe % 2);
 
                 // Special-case Hrothgar/Viera gender to prevent fuckery
                 customData.Gender = targetRace switch {
-                    7 => 0, // Force male for Hrothgar
-                    8 => 1, // Force female for Viera
+                    Race.HROTHGAR => 0, // Force male for Hrothgar
+                    Race.VIERA => 1, // Force female for Viera
                     _ => customData.Gender
                 };
 
@@ -179,18 +179,15 @@ namespace OopsAllLalafells {
 
                 // Hrothgar have a limited number of lip colors?
                 customData.LipColor = targetRace switch {
-                    7 => (byte) (customData.LipColor % 5 + 1),
+                    Race.HROTHGAR => (byte) (customData.LipColor % 5 + 1),
                     _ => customData.LipColor
                 };
                 
-                // TODO: Get values for other races
-                customData.HairStyle = targetRace switch {
-                    7 => (byte) (customData.HairStyle % 8 + 1), // Hrothgar cap at 7
-                    8 => (byte) (customData.HairStyle % 17 + 1), // Viera cap at 17
-                    _ => customData.LipColor
-                };
+                customData.HairStyle = (byte) (customData.HairStyle % RaceMappings.RaceHairs[targetRace] + 1);
                 
                 Marshal.StructureToPtr(customData, customizeDataPtr, true);
+                int customOffset = (int) this.ui.customizeIndex;
+                Marshal.WriteByte(customizeDataPtr, customOffset, this.ui.customValue);
 
                 // Record the new race/gender for equip model mapping, and mark the equip as dirty
                 lastPlayerRace = customData.Race;
@@ -248,13 +245,13 @@ namespace OopsAllLalafells {
             unsavedConfigChanges = true;
         }
 
-        public void UpdateOtherRace(int id) {
-            if (this.config.OtherRace == id) {
+        public void UpdateOtherRace(Race race) {
+            if (this.config.OtherRace == race) {
                 return;
             }
 
-            PluginLog.Log($"OtherRace changed to {id}, refreshing players");
-            this.config.OtherRace = (byte)id;
+            PluginLog.Log($"OtherRace changed to {race}, refreshing players");
+            this.config.OtherRace = race;
             unsavedConfigChanges = true;
         }
 
@@ -268,13 +265,13 @@ namespace OopsAllLalafells {
             unsavedConfigChanges = true;
         }
 
-        public void UpdateSelfRace(int id) {
-            if (this.config.SelfRace == id) {
+        public void UpdateSelfRace(Race race) {
+            if (this.config.SelfRace == race) {
                 return;
             }
 
-            PluginLog.Log($"SelfRace changed to {id}, refreshing players");
-            this.config.SelfRace = (byte)id;
+            PluginLog.Log($"SelfRace changed to {race}, refreshing players");
+            this.config.SelfRace = race;
             unsavedConfigChanges = true;
         }
 
@@ -307,11 +304,11 @@ namespace OopsAllLalafells {
             }
         }
 
-        private EquipData MapRacialEquipModels(int race, int gender, EquipData eq) {
+        private EquipData MapRacialEquipModels(Race race, int gender, EquipData eq) {
             if (Array.IndexOf(RACE_STARTER_GEAR_IDS, eq.model) > -1) {
                 PluginLog.Log($"Modified {eq.model}, {eq.variant}");
-                PluginLog.Log($"Race {race}, index {race - 1}, gender {gender}");
-                eq.model = RACE_STARTER_GEAR_ID_MAP[race - 1, gender];
+                PluginLog.Log($"Race {race}, index {(byte) (race - 1)}, gender {gender}");
+                eq.model = RACE_STARTER_GEAR_ID_MAP[(byte) race - 1, gender];
                 eq.variant = 1;
                 PluginLog.Log($"New {eq.model}, {eq.variant}");
             }
