@@ -13,13 +13,9 @@ using OopsAllLalafells.Attributes;
 namespace OopsAllLalafells {
     public class Plugin : IDalamudPlugin {
         private const uint CHARA_WINDOW_ACTOR_ID = 0xE0000000;
+        private const int  OFFSET_RENDER_TOGGLE  = 0x104;
 
-        private const int LALAFELL_RACE_ID = 3;
-
-        private const int OFFSET_RENDER_TOGGLE = 0x104;
-
-        private static readonly short[,] RACE_STARTER_GEAR_ID_MAP =
-        {
+        private static readonly short[,] RACE_STARTER_GEAR_ID_MAP = {
             {84, 85}, // Hyur
             {86, 87}, // Elezen
             {92, 93}, // Lalafell
@@ -33,7 +29,7 @@ namespace OopsAllLalafells {
         private static readonly short[] RACE_STARTER_GEAR_IDS;
 
         public string Name => "Oops, All Lalafells!";
-        public DalamudPluginInterface pluginInterface { get; private set; }
+        private DalamudPluginInterface pluginInterface;
         public Configuration config { get; private set; }
         private bool unsavedConfigChanges = false;
 
@@ -77,7 +73,7 @@ namespace OopsAllLalafells {
             this.config = (Configuration)this.pluginInterface.GetPluginConfig() ?? new Configuration();
             this.config.Initialize(pluginInterface);
 
-            this.ui = new PluginUI(this, pluginInterface);
+            this.ui = new PluginUI(this);
 
             this.pluginInterface.UiBuilder.OnBuildUi += this.ui.Draw;
             this.pluginInterface.UiBuilder.OnOpenConfigUi += OpenSettingsMenu;
@@ -126,12 +122,8 @@ namespace OopsAllLalafells {
                 lastWasModified = false;
                 var actor = Marshal.PtrToStructure<Actor>(lastActor);
 
-                if ((uint)actor.ActorId != CHARA_WINDOW_ACTOR_ID
-                    && this.pluginInterface.ClientState.LocalPlayer != null) {
-                    bool isSelf = actor.ActorId == this.pluginInterface.ClientState.LocalPlayer.ActorId;
-                    Race targetRace = isSelf ? this.config.SelfRace : this.config.OtherRace;
-                    this.LogRace(customizeDataPtr, targetRace);
-                    if (isSelf) {
+                if ((uint)actor.ActorId != CHARA_WINDOW_ACTOR_ID && this.pluginInterface.ClientState.LocalPlayer != null) {
+                    if (actor.ActorId == this.pluginInterface.ClientState.LocalPlayer.ActorId) {
                         if (this.config.SelfChange) {
                             this.ChangeRace(customizeDataPtr, this.config.SelfRace);
                         }
@@ -144,15 +136,6 @@ namespace OopsAllLalafells {
             }
 
             return charaInitHook.Original(drawObjectBase, customizeDataPtr);
-        }
-
-        private void LogRace(IntPtr customizeDataPtr, Race targetRace) {
-//#if(DEBUG)
-            var customData = Marshal.PtrToStructure<CharaCustomizeData>(customizeDataPtr);
-            if (customData.Race == targetRace) {
-                PluginLog.Log($"Existing hairStyle is {customData.HairStyle}");
-            }
-//#endif
         }
 
         private void ChangeRace(IntPtr customizeDataPtr, Race targetRace) {
@@ -186,43 +169,23 @@ namespace OopsAllLalafells {
                 customData.HairStyle = (byte) (customData.HairStyle % RaceMappings.RaceHairs[targetRace] + 1);
                 
                 Marshal.StructureToPtr(customData, customizeDataPtr, true);
-                int customOffset = (int) this.ui.customizeIndex;
-                Marshal.WriteByte(customizeDataPtr, customOffset, this.ui.customValue);
 
                 // Record the new race/gender for equip model mapping, and mark the equip as dirty
                 lastPlayerRace = customData.Race;
                 lastPlayerGender = customData.Gender;
                 lastWasModified = true;
-#if(DEBUG)
-                foreach (CustomizeIndex ndx in Enum.GetValues(typeof(CustomizeIndex))) {
-                    PluginLog.Log($"Modified {ndx} is {Marshal.PtrToStructure<byte>(customizeDataPtr + (int)ndx)}");
-                }
-#endif
             }
         }
 
         private IntPtr FlagSlotUpdateDetour(IntPtr actorPtr, uint slot, IntPtr equipDataPtr) {
-            if (lastWasPlayer) {
-                // LogEquipModels(equipData, !lastWasModified);
-                if (lastWasModified) {
-                    var equipData = Marshal.PtrToStructure<EquipData>(equipDataPtr);
-                    equipData = MapRacialEquipModels(lastPlayerRace, lastPlayerGender, equipData);
-                    Marshal.StructureToPtr(equipData, equipDataPtr, true);
-                }
+            if (lastWasPlayer && lastWasModified) {
+                var equipData = Marshal.PtrToStructure<EquipData>(equipDataPtr);
+                // TODO: Handle gender-locked gear for Viera/Hrothgar
+                equipData = MapRacialEquipModels(lastPlayerRace, lastPlayerGender, equipData);
+                Marshal.StructureToPtr(equipData, equipDataPtr, true);
             }
 
             return flagSlotUpdateHook.Original(actorPtr, slot, equipDataPtr);
-        }
-
-        private EquipData LogEquipModels(EquipData eq, bool correctRace) {
-#if(DEBUG)
-            if (correctRace) {
-                PluginLog.Log($"Modified {eq.model}, {eq.variant}");
-            } else {
-                PluginLog.Log($"Existing {eq.model}, {eq.variant}");
-            }
-#endif
-            return eq;
         }
 
         public bool SaveConfig() {

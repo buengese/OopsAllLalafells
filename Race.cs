@@ -2,23 +2,33 @@ using System.Collections.Generic;
 
 namespace OopsAllLalafells {
 	public enum Race : byte {
-        //[Display("Hyur")]
+        [Display("Hyur")]
 		HYUR = 1,
-        //[Display("Elezen")]
+        [Display("Elezen")]
         ELEZEN = 2,
-        //[Display("Lalafell")]
+        [Display("Lalafell")]
         LALAFELL = 3,
-        //[Display("Miqo'te")]
+        [Display("Miqo'te")]
         MIQUOTE = 4,
-        //[Display("Roegadyn")]
+        [Display("Roegadyn")]
         ROEGADYN = 5,
-        //[Display("Au Ra")]
+        [Display("Au Ra")]
         AU_RA = 6,
-        //[Display("Hrothgar")]
+        [Display("Hrothgar")]
         HROTHGAR = 7,
-        //[Display("Viera")]
+        [Display("Viera")]
         VIERA = 8
     }
+
+	public class Display : System.Attribute {
+		private readonly string _value;
+
+		public Display(string value) {
+			_value = value;
+		}
+
+		public string Value => _value;
+	}
 
     public class RaceMappings {
 	    public static readonly Dictionary<Race, int> RaceHairs = new Dictionary<Race, int> {
