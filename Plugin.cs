@@ -14,6 +14,7 @@ namespace OopsAllLalafells
 {
     public class Plugin : IDalamudPlugin
     {
+        private const uint FLAG_INVIS = (1 << 1) | (1 << 11);
         private const uint CHARA_WINDOW_ACTOR_ID = 0xE0000000;
         private const int OFFSET_RENDER_TOGGLE = 0x104;
 
@@ -136,8 +137,8 @@ namespace OopsAllLalafells
                 var actor = Marshal.PtrToStructure<Actor>(lastActor);
 
                 if ((uint) actor.ActorId != CHARA_WINDOW_ACTOR_ID
-                    && actor.ActorId != this.pluginInterface.ClientState.LocalPlayer.ActorId
                     && this.pluginInterface.ClientState.LocalPlayer != null
+                    && actor.ActorId != this.pluginInterface.ClientState.LocalPlayer.ActorId
                     && this.config.ShouldChangeOthers)
                 {
                     this.ChangeRace(customizeDataPtr, this.config.ChangeOthersTargetRace);
@@ -240,8 +241,10 @@ namespace OopsAllLalafells
             unsavedConfigChanges = true;
         }
 
-        public void RefreshAllPlayers()
+        public async void RefreshAllPlayers()
         {
+            // Workaround to prevent literally genociding the actor table if we load at the same time as Dalamud + Dalamud is loading while ingame
+            await Task.Delay(100); // LMFAOOOOOOOOOOOOOOOOOOO
             var localPlayer = this.pluginInterface.ClientState.LocalPlayer;
             if (localPlayer == null)
             {
@@ -265,11 +268,14 @@ namespace OopsAllLalafells
             try
             {
                 var addrRenderToggle = actor.Address + OFFSET_RENDER_TOGGLE;
-
+                var val = Marshal.ReadInt32(addrRenderToggle);
+                
                 // Trigger a rerender
-                Marshal.WriteInt32(addrRenderToggle, 2);
+                val |= (int) FLAG_INVIS;
+                Marshal.WriteInt32(addrRenderToggle, val);
                 await Task.Delay(100);
-                Marshal.WriteInt32(addrRenderToggle, 0);
+                val &= ~(int) FLAG_INVIS;
+                Marshal.WriteInt32(addrRenderToggle, val);
             }
             catch (Exception ex)
             {
