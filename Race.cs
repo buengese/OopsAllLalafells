@@ -9,7 +9,7 @@ namespace OopsAllLalafells {
         [Display("Lalafell")]
         LALAFELL = 3,
         [Display("Miqo'te")]
-        MIQUOTE = 4,
+        MIQOTE = 4,
         [Display("Roegadyn")]
         ROEGADYN = 5,
         [Display("Au Ra")]
@@ -35,7 +35,7 @@ namespace OopsAllLalafells {
 		    { Race.HYUR, 13 },
 		    { Race.ELEZEN, 12 },
 		    { Race.LALAFELL, 13 },
-		    { Race.MIQUOTE, 12 },
+		    { Race.MIQOTE, 12 },
 		    { Race.ROEGADYN, 13 },
 		    { Race.AU_RA, 12 },
 		    { Race.HROTHGAR, 8 },

@@ -10,12 +10,15 @@ using Dalamud.Plugin;
 using Dalamud.Hooking;
 using OopsAllLalafells.Attributes;
 
-namespace OopsAllLalafells {
-    public class Plugin : IDalamudPlugin {
+namespace OopsAllLalafells
+{
+    public class Plugin : IDalamudPlugin
+    {
         private const uint CHARA_WINDOW_ACTOR_ID = 0xE0000000;
-        private const int  OFFSET_RENDER_TOGGLE  = 0x104;
+        private const int OFFSET_RENDER_TOGGLE = 0x104;
 
-        private static readonly short[,] RACE_STARTER_GEAR_ID_MAP = {
+        private static readonly short[,] RACE_STARTER_GEAR_ID_MAP =
+        {
             {84, 85}, // Hyur
             {86, 87}, // Elezen
             {92, 93}, // Lalafell
@@ -56,10 +59,13 @@ namespace OopsAllLalafells {
         private byte lastPlayerGender;
 
         // This sucks, but here we are
-        static Plugin() {
+        static Plugin()
+        {
             var list = new List<short>();
-            foreach (short id in RACE_STARTER_GEAR_ID_MAP) {
-                if (id != -1) {
+            foreach (short id in RACE_STARTER_GEAR_ID_MAP)
+            {
+                if (id != -1)
+                {
                     list.Add(id);
                 }
             }
@@ -67,10 +73,11 @@ namespace OopsAllLalafells {
             RACE_STARTER_GEAR_IDS = list.ToArray();
         }
 
-        public void Initialize(DalamudPluginInterface pluginInterface) {
+        public void Initialize(DalamudPluginInterface pluginInterface)
+        {
             this.pluginInterface = pluginInterface;
 
-            this.config = (Configuration)this.pluginInterface.GetPluginConfig() ?? new Configuration();
+            this.config = (Configuration) this.pluginInterface.GetPluginConfig() ?? new Configuration();
             this.config.Initialize(pluginInterface);
 
             this.ui = new PluginUI(this);
@@ -106,48 +113,53 @@ namespace OopsAllLalafells {
             RefreshAllPlayers();
         }
 
-        private IntPtr CharacterIsMountedDetour(IntPtr actorPtr) {
-            if (Marshal.ReadByte(actorPtr + ActorOffsets.ObjectKind) == (byte)ObjectKind.Player) {
+        private IntPtr CharacterIsMountedDetour(IntPtr actorPtr)
+        {
+            if (Marshal.ReadByte(actorPtr + ActorOffsets.ObjectKind) == (byte) ObjectKind.Player)
+            {
                 lastActor = actorPtr;
                 lastWasPlayer = true;
-            } else {
+            }
+            else
+            {
                 lastWasPlayer = false;
             }
 
             return charaMountedHook.Original(actorPtr);
         }
 
-        private IntPtr CharacterInitializeDetour(IntPtr drawObjectBase, IntPtr customizeDataPtr) {
-            if (lastWasPlayer)  {
+        private IntPtr CharacterInitializeDetour(IntPtr drawObjectBase, IntPtr customizeDataPtr)
+        {
+            if (lastWasPlayer)
+            {
                 lastWasModified = false;
                 var actor = Marshal.PtrToStructure<Actor>(lastActor);
 
-                if ((uint)actor.ActorId != CHARA_WINDOW_ACTOR_ID && this.pluginInterface.ClientState.LocalPlayer != null) {
-                    if (actor.ActorId == this.pluginInterface.ClientState.LocalPlayer.ActorId) {
-                        if (this.config.SelfChange) {
-                            this.ChangeRace(customizeDataPtr, this.config.SelfRace);
-                        }
-                    } else {
-                        if (this.config.OtherChange) {
-                            this.ChangeRace(customizeDataPtr, this.config.OtherRace);
-                        }
-                    }
+                if ((uint) actor.ActorId != CHARA_WINDOW_ACTOR_ID
+                    && actor.ActorId != this.pluginInterface.ClientState.LocalPlayer.ActorId
+                    && this.pluginInterface.ClientState.LocalPlayer != null
+                    && this.config.ShouldChangeOthers)
+                {
+                    this.ChangeRace(customizeDataPtr, this.config.ChangeOthersTargetRace);
                 }
             }
 
             return charaInitHook.Original(drawObjectBase, customizeDataPtr);
         }
 
-        private void ChangeRace(IntPtr customizeDataPtr, Race targetRace) {
+        private void ChangeRace(IntPtr customizeDataPtr, Race targetRace)
+        {
             var customData = Marshal.PtrToStructure<CharaCustomizeData>(customizeDataPtr);
 
-            if (customData.Race != targetRace) {
+            if (customData.Race != targetRace)
+            {
                 // Modify the race/tribe accordingly
                 customData.Race = targetRace;
-                customData.Tribe = (byte)((byte) customData.Race * 2 - customData.Tribe % 2);
+                customData.Tribe = (byte) ((byte) customData.Race * 2 - customData.Tribe % 2);
 
                 // Special-case Hrothgar/Viera gender to prevent fuckery
-                customData.Gender = targetRace switch {
+                customData.Gender = targetRace switch
+                {
                     Race.HROTHGAR => 0, // Force male for Hrothgar
                     Race.VIERA => 1, // Force female for Viera
                     _ => customData.Gender
@@ -161,13 +173,14 @@ namespace OopsAllLalafells {
                 customData.ModelType %= 2;
 
                 // Hrothgar have a limited number of lip colors?
-                customData.LipColor = targetRace switch {
+                customData.LipColor = targetRace switch
+                {
                     Race.HROTHGAR => (byte) (customData.LipColor % 5 + 1),
                     _ => customData.LipColor
                 };
-                
+
                 customData.HairStyle = (byte) (customData.HairStyle % RaceMappings.RaceHairs[targetRace] + 1);
-                
+
                 Marshal.StructureToPtr(customData, customizeDataPtr, true);
 
                 // Record the new race/gender for equip model mapping, and mark the equip as dirty
@@ -177,8 +190,10 @@ namespace OopsAllLalafells {
             }
         }
 
-        private IntPtr FlagSlotUpdateDetour(IntPtr actorPtr, uint slot, IntPtr equipDataPtr) {
-            if (lastWasPlayer && lastWasModified) {
+        private IntPtr FlagSlotUpdateDetour(IntPtr actorPtr, uint slot, IntPtr equipDataPtr)
+        {
+            if (lastWasPlayer && lastWasModified)
+            {
                 var equipData = Marshal.PtrToStructure<EquipData>(equipDataPtr);
                 // TODO: Handle gender-locked gear for Viera/Hrothgar
                 equipData = MapRacialEquipModels(lastPlayerRace, lastPlayerGender, equipData);
@@ -188,92 +203,93 @@ namespace OopsAllLalafells {
             return flagSlotUpdateHook.Original(actorPtr, slot, equipDataPtr);
         }
 
-        public bool SaveConfig() {
-            if (this.unsavedConfigChanges) {
+        public bool SaveConfig()
+        {
+            if (this.unsavedConfigChanges)
+            {
                 this.config.Save();
                 this.unsavedConfigChanges = false;
                 this.RefreshAllPlayers();
                 return true;
             }
+
             return false;
         }
 
-        public void ToggleOtherRace(bool changeRace) {
-            if (this.config.OtherChange == changeRace) {
+        public void ToggleOtherRace(bool changeRace)
+        {
+            if (this.config.ShouldChangeOthers == changeRace)
+            {
                 return;
             }
 
-            PluginLog.Log($"OtherRace toggled to {changeRace}, refreshing players");
-            this.config.OtherChange = changeRace;
+            PluginLog.Log($"Target race for other players toggled to {changeRace}, refreshing players");
+            this.config.ShouldChangeOthers = changeRace;
             unsavedConfigChanges = true;
         }
 
-        public void UpdateOtherRace(Race race) {
-            if (this.config.OtherRace == race) {
+        public void UpdateOtherRace(Race race)
+        {
+            if (this.config.ChangeOthersTargetRace == race)
+            {
                 return;
             }
 
-            PluginLog.Log($"OtherRace changed to {race}, refreshing players");
-            this.config.OtherRace = race;
+            PluginLog.Log($"Target race for other players changed to {race}, refreshing players");
+            this.config.ChangeOthersTargetRace = race;
             unsavedConfigChanges = true;
         }
 
-        public void ToggleSelfRace(bool changeRace) {
-            if (this.config.SelfChange == changeRace) {
-                return;
-            }
-
-            PluginLog.Log($"SelfRace toggled to {changeRace}, refreshing players");
-            this.config.SelfChange = changeRace;
-            unsavedConfigChanges = true;
-        }
-
-        public void UpdateSelfRace(Race race) {
-            if (this.config.SelfRace == race) {
-                return;
-            }
-
-            PluginLog.Log($"SelfRace changed to {race}, refreshing players");
-            this.config.SelfRace = race;
-            unsavedConfigChanges = true;
-        }
-
-        public void RefreshAllPlayers() {
+        public void RefreshAllPlayers()
+        {
             var localPlayer = this.pluginInterface.ClientState.LocalPlayer;
-            if (localPlayer == null) {
+            if (localPlayer == null)
+            {
                 return;
             }
 
-            for (var i = 0; i < this.pluginInterface.ClientState.Actors.Length; i++) {
+            for (var i = 0; i < this.pluginInterface.ClientState.Actors.Length; i++)
+            {
                 var actor = this.pluginInterface.ClientState.Actors[i];
 
                 if (actor != null
-                    && actor.ObjectKind == ObjectKind.Player) {
+                    && actor.ObjectKind == ObjectKind.Player)
+                {
                     RerenderActor(actor);
                 }
             }
         }
 
-        private async void RerenderActor(Dalamud.Game.ClientState.Actors.Types.Actor actor) {
-            try {
+        private async void RerenderActor(Dalamud.Game.ClientState.Actors.Types.Actor actor)
+        {
+            try
+            {
                 var addrRenderToggle = actor.Address + OFFSET_RENDER_TOGGLE;
 
                 // Trigger a rerender
                 Marshal.WriteInt32(addrRenderToggle, 2);
                 await Task.Delay(100);
                 Marshal.WriteInt32(addrRenderToggle, 0);
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 PluginLog.LogError(ex.ToString());
             }
         }
 
-        private EquipData MapRacialEquipModels(Race race, int gender, EquipData eq) {
-            if (Array.IndexOf(RACE_STARTER_GEAR_IDS, eq.model) > -1) {
+        private EquipData MapRacialEquipModels(Race race, int gender, EquipData eq)
+        {
+            if (Array.IndexOf(RACE_STARTER_GEAR_IDS, eq.model) > -1)
+            {
+#if DEBUG
                 PluginLog.Log($"Modified {eq.model}, {eq.variant}");
                 PluginLog.Log($"Race {race}, index {(byte) (race - 1)}, gender {gender}");
+#endif
                 eq.model = RACE_STARTER_GEAR_ID_MAP[(byte) race - 1, gender];
                 eq.variant = 1;
+#if DEBUG
                 PluginLog.Log($"New {eq.model}, {eq.variant}");
+#endif
             }
 
             return eq;
@@ -281,17 +297,20 @@ namespace OopsAllLalafells {
 
         [Command("/poal")]
         [HelpMessage("Opens the Oops, All Lalafells! settings menu.")]
-        public void OpenSettingsMenuCommand(string command, string args) {
+        public void OpenSettingsMenuCommand(string command, string args)
+        {
             OpenSettingsMenu(command, args);
         }
 
-        private void OpenSettingsMenu(object a, object b) {
+        private void OpenSettingsMenu(object a, object b)
+        {
             this.SettingsVisible = true;
         }
 
         #region IDisposable Support
 
-        protected virtual void Dispose(bool disposing) {
+        protected virtual void Dispose(bool disposing)
+        {
             if (!disposing) return;
 
             this.commandManager.Dispose();
@@ -314,12 +333,12 @@ namespace OopsAllLalafells {
             this.pluginInterface.Dispose();
         }
 
-        public void Dispose() {
+        public void Dispose()
+        {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
 
         #endregion
     }
-
 }
