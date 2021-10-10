@@ -6,7 +6,7 @@
         <Version>1.2.0.0</Version>
         <Description>Turn everyone around you into Lalafells (or other races)!</Description>
         <Copyright>(c) 2021 Ava Ryan</Copyright>
-        <PackageProjectUrl>https://git.cozy.gay/dalamud/OopsAllLalafells</PackageProjectUrl>
+        <PackageProjectUrl>https://ava.dev/oops-all-lalafells/</PackageProjectUrl>
     </PropertyGroup>
 
     <PropertyGroup>
