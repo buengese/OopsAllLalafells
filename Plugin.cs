@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -153,7 +154,7 @@ namespace OopsAllLalafells
                 lastWasModified = false;
                 var actor = this.objectTable.CreateObjectReference(lastActor);
                 if (actor != null &&
-                    actor.ObjectId != CHARA_WINDOW_ACTOR_ID
+                    (actor.ObjectId != CHARA_WINDOW_ACTOR_ID || this.config.ImmersiveMode)
                     && this.clientState.LocalPlayer != null
                     && actor.ObjectId != this.clientState.LocalPlayer.ObjectId
                     && this.config.ShouldChangeOthers)
@@ -258,6 +259,18 @@ namespace OopsAllLalafells
             unsavedConfigChanges = true;
         }
 
+        public void UpdateImmersiveMode(bool immersiveMode)
+        {
+            if (this.config.ImmersiveMode == immersiveMode)
+            {
+                return;
+            }
+            
+            PluginLog.Log($"Immersive mode set to {immersiveMode}, refreshing players");
+            this.config.ImmersiveMode = immersiveMode;
+            unsavedConfigChanges = true;
+        }
+        
         public async void RefreshAllPlayers()
         {
             // Workaround to prevent literally genociding the actor table if we load at the same time as Dalamud + Dalamud is loading while ingame

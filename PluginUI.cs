@@ -28,45 +28,46 @@ namespace OopsAllLalafells
             {
                 bool shouldChangeOthers = this.plugin.config.ShouldChangeOthers;
                 ImGui.Checkbox("Change other players", ref shouldChangeOthers);
-                
-                if (enableExperimental)
+
+                Race othersTargetRace = this.plugin.config.ChangeOthersTargetRace;
+                if (shouldChangeOthers)
                 {
-                    Race othersTargetRace = this.plugin.config.ChangeOthersTargetRace;
-                    if (shouldChangeOthers)
+                    if (ImGui.BeginCombo("Race", othersTargetRace.GetAttribute<Display>().Value))
                     {
-                        if (ImGui.BeginCombo("Race", othersTargetRace.GetAttribute<Display>().Value))
+                        foreach (Race race in Enum.GetValues(typeof(Race)))
                         {
-                            foreach (Race race in Enum.GetValues(typeof(Race)))
+                            ImGui.PushID((byte) race);
+                            if (ImGui.Selectable(race.GetAttribute<Display>().Value, race == othersTargetRace))
                             {
-                                ImGui.PushID((byte) race);
-                                if (ImGui.Selectable(race.GetAttribute<Display>().Value, race == othersTargetRace))
-                                {
-                                    othersTargetRace = race;
-                                }
-
-                                if (race == othersTargetRace)
-                                {
-                                    ImGui.SetItemDefaultFocus();
-                                }
-
-                                ImGui.PopID();
+                                othersTargetRace = race;
                             }
 
-                            ImGui.EndCombo();
+                            if (race == othersTargetRace)
+                            {
+                                ImGui.SetItemDefaultFocus();
+                            }
+
+                            ImGui.PopID();
                         }
+
+                        ImGui.EndCombo();
                     }
-                    
-                    this.plugin.UpdateOtherRace(othersTargetRace);
                 }
-                else
-                {
-                    this.plugin.UpdateOtherRace(Race.LALAFELL);
-                }
-                
+
+                this.plugin.UpdateOtherRace(othersTargetRace);
                 this.plugin.ToggleOtherRace(shouldChangeOthers);
-                
+
+                if (enableExperimental)
+                {
+                    bool immersiveMode = this.plugin.config.ImmersiveMode;
+                    ImGui.Checkbox("Immersive Mode", ref immersiveMode);
+                    ImGui.Text("If Immersive Mode is enabled, \"Examine\" windows will also be modified.");
+
+                    this.plugin.UpdateImmersiveMode(immersiveMode);
+                }
+
                 ImGui.Separator();
-                
+
                 ImGui.Checkbox("Enable Experimental Features", ref this.enableExperimental);
                 if (enableExperimental)
                 {
@@ -76,8 +77,9 @@ namespace OopsAllLalafells
 
                     ImGui.TextColored(WHAT_THE_HELL_ARE_YOU_DOING,
                         "Experimental features may crash your game, uncat your boy,\nor cause the Eighth Umbral Calamity. YOU HAVE BEEN WARNED!");
-                    
-                    ImGui.Text("But seriously, if you do encounter any crashes, please report\nthem to Avaflow#0001 on Discord with whatever details you can get.");
+
+                    ImGui.Text(
+                        "But seriously, if you do encounter any crashes, please report\nthem to Avaflow#0001 on Discord with whatever details you can get.");
                 }
 
                 ImGui.End();
