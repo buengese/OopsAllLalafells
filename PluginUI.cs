@@ -1,7 +1,7 @@
 using ImGuiNET;
 using System;
 using System.Numerics;
-using Dalamud.Game.Text;
+using Dalamud.Utility;
 
 namespace OopsAllLalafells
 {

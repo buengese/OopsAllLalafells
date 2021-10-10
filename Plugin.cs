@@ -2,13 +2,19 @@
 
 using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using Dalamud.Game.ClientState.Actors;
-using Dalamud.Game.ClientState.Structs;
+using Dalamud.Game;
+using Dalamud.Game.ClientState;
+using Dalamud.Game.ClientState.Objects;
+using Dalamud.Game.ClientState.Objects.Enums;
+using Dalamud.Game.ClientState.Objects.Types;
+using Dalamud.Game.Command;
 using Dalamud.Plugin;
 using Dalamud.Hooking;
-using OopsAllLalafells.Attributes;
+using Dalamud.IoC;
+using Dalamud.Logging;
 
 namespace OopsAllLalafells
 {
@@ -33,14 +39,19 @@ namespace OopsAllLalafells
         private static readonly short[] RACE_STARTER_GEAR_IDS;
 
         public string Name => "Oops, All Lalafells!";
-        private DalamudPluginInterface pluginInterface;
+
+        [PluginService] private DalamudPluginInterface pluginInterface { get; set; }
+        [PluginService] private ObjectTable objectTable { get; set; }
+        [PluginService] private CommandManager commandManager { get; set; }
+        [PluginService] private SigScanner sigScanner { get; set; }
+        [PluginService] private ClientState clientState { get; set; }
+
         public Configuration config { get; private set; }
+
         private bool unsavedConfigChanges = false;
 
         private PluginUI ui;
         public bool SettingsVisible = false;
-
-        private PluginCommandManager<Plugin> commandManager;
 
         private delegate IntPtr CharacterIsMounted(IntPtr actor);
 
@@ -74,28 +85,33 @@ namespace OopsAllLalafells
             RACE_STARTER_GEAR_IDS = list.ToArray();
         }
 
-        public void Initialize(DalamudPluginInterface pluginInterface)
+        public Plugin()
         {
-            this.pluginInterface = pluginInterface;
-
             this.config = (Configuration) this.pluginInterface.GetPluginConfig() ?? new Configuration();
             this.config.Initialize(pluginInterface);
 
             this.ui = new PluginUI(this);
 
-            this.pluginInterface.UiBuilder.OnBuildUi += this.ui.Draw;
-            this.pluginInterface.UiBuilder.OnOpenConfigUi += OpenSettingsMenu;
+            this.pluginInterface.UiBuilder.Draw += this.ui.Draw;
+            this.pluginInterface.UiBuilder.OpenConfigUi += OpenSettingsMenu;
 
-            this.commandManager = new PluginCommandManager<Plugin>(this, this.pluginInterface);
+            this.commandManager.AddHandler(
+                "poal",
+                new CommandInfo(this.OpenSettingsMenuCommand)
+                {
+                    HelpMessage = "Opens the Oops, All Lalafells! settings menu.",
+                    ShowInHelp = true
+                }
+            );
 
             var charaMountedAddr =
-                this.pluginInterface.TargetModuleScanner.ScanText("48 83 EC 28 48 8B 01 FF 50 18 83 F8 08 0F 94 C0");
+                this.sigScanner.ScanText("48 83 EC 28 48 8B 01 FF 50 18 83 F8 08 0F 94 C0");
             PluginLog.Log($"Found IsMounted address: {charaMountedAddr.ToInt64():X}");
             this.charaMountedHook ??=
                 new Hook<CharacterIsMounted>(charaMountedAddr, new CharacterIsMounted(CharacterIsMountedDetour));
             this.charaMountedHook.Enable();
 
-            var charaInitAddr = this.pluginInterface.TargetModuleScanner.ScanText(
+            var charaInitAddr = this.sigScanner.ScanText(
                 "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC 30 48 8B F9 48 8B EA 48 81 C1 ?? ?? ?? ?? E8 ?? ?? ?? ??");
             PluginLog.Log($"Found Initialize address: {charaInitAddr.ToInt64():X}");
             this.charaInitHook ??=
@@ -103,7 +119,7 @@ namespace OopsAllLalafells
             this.charaInitHook.Enable();
 
             var flagSlotUpdateAddr =
-                this.pluginInterface.TargetModuleScanner.ScanText(
+                this.sigScanner.ScanText(
                     "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 8B DA 49 8B F0 48 8B F9 83 FA 0A");
             PluginLog.Log($"Found FlagSlotUpdate address: {flagSlotUpdateAddr.ToInt64():X}");
             this.flagSlotUpdateHook ??=
@@ -116,7 +132,8 @@ namespace OopsAllLalafells
 
         private IntPtr CharacterIsMountedDetour(IntPtr actorPtr)
         {
-            if (Marshal.ReadByte(actorPtr + ActorOffsets.ObjectKind) == (byte) ObjectKind.Player)
+            // TODO: use native FFXIVClientStructs unsafe methods?
+            if (Marshal.ReadByte(actorPtr + 0x8C) == (byte) ObjectKind.Player)
             {
                 lastActor = actorPtr;
                 lastWasPlayer = true;
@@ -134,11 +151,11 @@ namespace OopsAllLalafells
             if (lastWasPlayer)
             {
                 lastWasModified = false;
-                var actor = Marshal.PtrToStructure<Actor>(lastActor);
-
-                if ((uint) actor.ActorId != CHARA_WINDOW_ACTOR_ID
-                    && this.pluginInterface.ClientState.LocalPlayer != null
-                    && actor.ActorId != this.pluginInterface.ClientState.LocalPlayer.ActorId
+                var actor = this.objectTable.CreateObjectReference(lastActor);
+                if (actor != null &&
+                    actor.ObjectId != CHARA_WINDOW_ACTOR_ID
+                    && this.clientState.LocalPlayer != null
+                    && actor.ObjectId != this.clientState.LocalPlayer.ObjectId
                     && this.config.ShouldChangeOthers)
                 {
                     this.ChangeRace(customizeDataPtr, this.config.ChangeOthersTargetRace);
@@ -245,15 +262,15 @@ namespace OopsAllLalafells
         {
             // Workaround to prevent literally genociding the actor table if we load at the same time as Dalamud + Dalamud is loading while ingame
             await Task.Delay(100); // LMFAOOOOOOOOOOOOOOOOOOO
-            var localPlayer = this.pluginInterface.ClientState.LocalPlayer;
+            var localPlayer = this.clientState.LocalPlayer;
             if (localPlayer == null)
             {
                 return;
             }
 
-            for (var i = 0; i < this.pluginInterface.ClientState.Actors.Length; i++)
+            for (var i = 0; i < this.objectTable.Length; i++)
             {
-                var actor = this.pluginInterface.ClientState.Actors[i];
+                var actor = this.objectTable[i];
 
                 if (actor != null
                     && actor.ObjectKind == ObjectKind.Player)
@@ -263,13 +280,13 @@ namespace OopsAllLalafells
             }
         }
 
-        private async void RerenderActor(Dalamud.Game.ClientState.Actors.Types.Actor actor)
+        private async void RerenderActor(GameObject actor)
         {
             try
             {
                 var addrRenderToggle = actor.Address + OFFSET_RENDER_TOGGLE;
                 var val = Marshal.ReadInt32(addrRenderToggle);
-                
+
                 // Trigger a rerender
                 val |= (int) FLAG_INVIS;
                 Marshal.WriteInt32(addrRenderToggle, val);
@@ -301,14 +318,12 @@ namespace OopsAllLalafells
             return eq;
         }
 
-        [Command("/poal")]
-        [HelpMessage("Opens the Oops, All Lalafells! settings menu.")]
         public void OpenSettingsMenuCommand(string command, string args)
         {
-            OpenSettingsMenu(command, args);
+            OpenSettingsMenu();
         }
 
-        private void OpenSettingsMenu(object a, object b)
+        private void OpenSettingsMenu()
         {
             this.SettingsVisible = true;
         }
@@ -319,10 +334,8 @@ namespace OopsAllLalafells
         {
             if (!disposing) return;
 
-            this.commandManager.Dispose();
-
-            this.pluginInterface.UiBuilder.OnOpenConfigUi -= OpenSettingsMenu;
-            this.pluginInterface.UiBuilder.OnBuildUi -= this.ui.Draw;
+            this.pluginInterface.UiBuilder.OpenConfigUi -= OpenSettingsMenu;
+            this.pluginInterface.UiBuilder.Draw -= this.ui.Draw;
             this.SaveConfig();
 
             this.charaMountedHook.Disable();

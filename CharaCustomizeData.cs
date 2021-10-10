@@ -1,5 +1,5 @@
 using System.Runtime.InteropServices;
-using Dalamud.Game.ClientState.Actors;
+using Dalamud.Game.ClientState.Objects.Enums;
 
 namespace OopsAllLalafells {
     [StructLayout((LayoutKind.Explicit))]
