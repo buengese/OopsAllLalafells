@@ -265,12 +265,12 @@ namespace OopsAllLalafells
             {
                 return;
             }
-            
+
             PluginLog.Log($"Immersive mode set to {immersiveMode}, refreshing players");
             this.config.ImmersiveMode = immersiveMode;
             unsavedConfigChanges = true;
         }
-        
+
         public async void RefreshAllPlayers()
         {
             // Workaround to prevent literally genociding the actor table if we load at the same time as Dalamud + Dalamud is loading while ingame
@@ -361,6 +361,8 @@ namespace OopsAllLalafells
 
             // Refresh all players again
             RefreshAllPlayers();
+
+            this.commandManager.RemoveHandler("/poal");
 
             this.pluginInterface.Dispose();
         }

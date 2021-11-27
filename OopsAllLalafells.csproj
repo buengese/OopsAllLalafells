@@ -7,6 +7,7 @@
         <Description>Turn everyone around you into Lalafells (or other races)!</Description>
         <Copyright>(c) 2021 Ava Ryan</Copyright>
         <PackageProjectUrl>https://ava.dev/oops-all-lalafells/</PackageProjectUrl>
+        <PackageVersion>1.2.2.0</PackageVersion>
     </PropertyGroup>
 
     <PropertyGroup>

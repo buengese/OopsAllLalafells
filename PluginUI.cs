@@ -1,6 +1,8 @@
 using ImGuiNET;
 using System;
+using System.Diagnostics;
 using System.Numerics;
+using System.Threading.Tasks;
 using Dalamud.Utility;
 
 namespace OopsAllLalafells
@@ -10,6 +12,11 @@ namespace OopsAllLalafells
         private static Vector4 WHAT_THE_HELL_ARE_YOU_DOING = new Vector4(1, 0, 0, 1);
         private readonly Plugin plugin;
         private bool enableExperimental;
+
+        // had to do it
+        private bool changeSelf;
+        private bool changeSelfLaunched;
+        private bool changeSelfShowText;
 
         public PluginUI(Plugin plugin)
         {
@@ -57,6 +64,24 @@ namespace OopsAllLalafells
                 this.plugin.UpdateOtherRace(othersTargetRace);
                 this.plugin.ToggleOtherRace(shouldChangeOthers);
 
+                ImGui.Checkbox("Change self", ref this.changeSelf);
+                if (changeSelf)
+                {
+                    if (!changeSelfLaunched)
+                    {
+                        changeSelfLaunched = true;
+                        Process.Start("explorer", "https://store.finalfantasyxiv.com/ffxivstore/en-us/product/1");
+                        TriggerChangeSelfText();
+                    }
+
+                    if (changeSelfShowText)
+                    {
+                        ImGui.TextColored(WHAT_THE_HELL_ARE_YOU_DOING,
+                            "Changing your own character's race/gender is not, and will never, be\na feature of this plugin. " +
+                            "This is a policy held by both myself as the developer,\nas well as by the XIVLauncher/Dalamud folks. Sorry to be the bearer of bad news!");
+                    }
+                }
+
                 if (enableExperimental)
                 {
                     bool immersiveMode = this.plugin.config.ImmersiveMode;
@@ -87,6 +112,12 @@ namespace OopsAllLalafells
 
             this.plugin.SettingsVisible = settingsVisible;
             this.plugin.SaveConfig();
+        }
+
+        private async void TriggerChangeSelfText()
+        {
+            await Task.Delay(2000);
+            changeSelfShowText = true;
         }
     }
 }
