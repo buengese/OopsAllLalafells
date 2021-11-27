@@ -97,7 +97,7 @@ namespace OopsAllLalafells
             this.pluginInterface.UiBuilder.OpenConfigUi += OpenSettingsMenu;
 
             this.commandManager.AddHandler(
-                "poal",
+                "/poal",
                 new CommandInfo(this.OpenSettingsMenuCommand)
                 {
                     HelpMessage = "Opens the Oops, All Lalafells! settings menu.",
