@@ -3,7 +3,7 @@
     <PropertyGroup>
         <Authors>Avaflow</Authors>
         <Company>Avaflow</Company>
-        <Version>1.2.0.0</Version>
+        <Version>1.2.2.0</Version>
         <Description>Turn everyone around you into Lalafells (or other races)!</Description>
         <Copyright>(c) 2021 Ava Ryan</Copyright>
         <PackageProjectUrl>https://ava.dev/oops-all-lalafells/</PackageProjectUrl>
