@@ -176,11 +176,10 @@ namespace OopsAllLalafells
                 customData.Race = targetRace;
                 customData.Tribe = (byte) ((byte) customData.Race * 2 - customData.Tribe % 2);
 
-                // Special-case Hrothgar/Viera gender to prevent fuckery
+                // Special-case Hrothgar gender to prevent fuckery
                 customData.Gender = targetRace switch
                 {
                     Race.HROTHGAR => 0, // Force male for Hrothgar
-                    Race.VIERA => 1, // Force female for Viera
                     _ => customData.Gender
                 };
 
