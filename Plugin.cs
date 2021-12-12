@@ -54,13 +54,13 @@ namespace OopsAllLalafells
         private PluginUI ui;
         public bool SettingsVisible = false;
 
-        private delegate IntPtr CharacterIsMounted(IntPtr actor);
+        private delegate IntPtr CharacterIsMount(IntPtr actor);
 
         private delegate IntPtr CharacterInitialize(IntPtr actorPtr, IntPtr customizeDataPtr);
 
         private delegate IntPtr FlagSlotUpdate(IntPtr actorPtr, uint slot, IntPtr equipData);
 
-        private Hook<CharacterIsMounted> charaMountedHook;
+        private Hook<CharacterIsMount> charaMountedHook;
         private Hook<CharacterInitialize> charaInitHook;
         private Hook<FlagSlotUpdate> flagSlotUpdateHook;
 
@@ -105,18 +105,18 @@ namespace OopsAllLalafells
                 }
             );
 
-            var charaMountedAddr =
-                this.sigScanner.ScanText("48 83 EC 28 48 8B 01 FF 50 18 83 F8 08 0F 94 C0");
-            PluginLog.Log($"Found IsMounted address: {charaMountedAddr.ToInt64():X}");
+            var charaIsMountAddr =
+                this.sigScanner.ScanText("40 53 48 83 EC 20 48 8B 01 48 8B D9 FF 50 18 83 F8 08 75 08");
+            PluginLog.Log($"Found IsMount address: {charaIsMountAddr.ToInt64():X}");
             this.charaMountedHook ??=
-                new Hook<CharacterIsMounted>(charaMountedAddr, new CharacterIsMounted(CharacterIsMountedDetour));
+                new Hook<CharacterIsMount>(charaIsMountAddr, CharacterIsMountDetour);
             this.charaMountedHook.Enable();
 
             var charaInitAddr = this.sigScanner.ScanText(
                 "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC 30 48 8B F9 48 8B EA 48 81 C1 ?? ?? ?? ?? E8 ?? ?? ?? ??");
             PluginLog.Log($"Found Initialize address: {charaInitAddr.ToInt64():X}");
             this.charaInitHook ??=
-                new Hook<CharacterInitialize>(charaInitAddr, new CharacterInitialize(CharacterInitializeDetour));
+                new Hook<CharacterInitialize>(charaInitAddr, CharacterInitializeDetour);
             this.charaInitHook.Enable();
 
             var flagSlotUpdateAddr =
@@ -124,14 +124,14 @@ namespace OopsAllLalafells
                     "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 8B DA 49 8B F0 48 8B F9 83 FA 0A");
             PluginLog.Log($"Found FlagSlotUpdate address: {flagSlotUpdateAddr.ToInt64():X}");
             this.flagSlotUpdateHook ??=
-                new Hook<FlagSlotUpdate>(flagSlotUpdateAddr, new FlagSlotUpdate(FlagSlotUpdateDetour));
+                new Hook<FlagSlotUpdate>(flagSlotUpdateAddr, FlagSlotUpdateDetour);
             this.flagSlotUpdateHook.Enable();
 
             // Trigger an initial refresh of all players
             RefreshAllPlayers();
         }
 
-        private IntPtr CharacterIsMountedDetour(IntPtr actorPtr)
+        private IntPtr CharacterIsMountDetour(IntPtr actorPtr)
         {
             // TODO: use native FFXIVClientStructs unsafe methods?
             if (Marshal.ReadByte(actorPtr + 0x8C) == (byte) ObjectKind.Player)

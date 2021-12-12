@@ -16,6 +16,10 @@
         <PlatformTarget>x64</PlatformTarget>
     </PropertyGroup>
 
+    <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+      <DefineConstants>TRACE,DEBUG</DefineConstants>
+    </PropertyGroup>
+
     <ItemGroup>
         <PackageReference Include="DalamudPackager" Version="2.1.4" />
     </ItemGroup>
