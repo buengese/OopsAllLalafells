@@ -1,9 +1,9 @@
 ﻿name: Oops, All Lalafells!
-author: Avaflow
+author: Avaflow, buengese
 punchline: That one funny plugin your friend told you about.
 description: |-
   Turn everyone around you into Lalafells (or other races!)
   
   Use /poal to open settings.
-repo_url: https://ava.dev/oops-all-lalafells/
+repo_url: https://github.com/buengese/OopsAllLalafells/
 icon_url: https://raw.githubusercontent.com/goatcorp/DalamudPlugins/api5/plugins/OopsAllLalafells/images/icon.png
