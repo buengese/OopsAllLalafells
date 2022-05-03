@@ -28,7 +28,7 @@ internal class PluginAddressResolver : BaseAddressResolver
     /// <inheritdoc/>
     protected override void Setup64Bit(SigScanner scanner)
     {
-        this.CharacterIsMount = scanner.GetStaticAddressFromSig("40 53 48 83 EC 20 48 8B 01 48 8B D9 FF 50 18 83 F8 08 75 08");
+        this.CharacterIsMount = scanner.ScanText("40 53 48 83 EC 20 48 8B 01 48 8B D9 FF 50 10 83 F8 08 75 08");
 
         this.CharacterInitialize = scanner.ScanText("48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC 30 48 8B F9 48 8B EA 48 81 C1 ?? ?? ?? ?? E8 ?? ?? ?? ??");
 
