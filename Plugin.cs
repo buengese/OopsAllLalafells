@@ -41,12 +41,6 @@ namespace OopsAllLalafells
 
         public string Name => "Oops, All Lalafells!";
 
-        [PluginService] private DalamudPluginInterface pluginInterface { get; set; }
-        [PluginService] private ObjectTable objectTable { get; set; }
-        [PluginService] private CommandManager commandManager { get; set; }
-        [PluginService] private SigScanner sigScanner { get; set; }
-        [PluginService] private ClientState clientState { get; set; }
-
         public Configuration config { get; private set; }
 
         private bool unsavedConfigChanges = false;
@@ -86,17 +80,21 @@ namespace OopsAllLalafells
             RACE_STARTER_GEAR_IDS = list.ToArray();
         }
 
-        public Plugin()
+        public Plugin(DalamudPluginInterface pluginInterface)
         {
-            this.config = (Configuration) this.pluginInterface.GetPluginConfig() ?? new Configuration();
+            pluginInterface.Create<Service>();
+            Service.Address = new PluginAddressResolver();
+            Service.Address.Setup();
+
+            this.config = (Configuration) pluginInterface.GetPluginConfig() ?? new Configuration();
             this.config.Initialize(pluginInterface);
 
             this.ui = new PluginUI(this);
 
-            this.pluginInterface.UiBuilder.Draw += this.ui.Draw;
-            this.pluginInterface.UiBuilder.OpenConfigUi += OpenSettingsMenu;
+            Service.Interface.UiBuilder.Draw += this.ui.Draw;
+            Service.Interface.UiBuilder.OpenConfigUi += OpenSettingsMenu;
 
-            this.commandManager.AddHandler(
+            Service.CommandManager.AddHandler(
                 "/poal",
                 new CommandInfo(this.OpenSettingsMenuCommand)
                 {
@@ -105,26 +103,17 @@ namespace OopsAllLalafells
                 }
             );
 
-            var charaIsMountAddr =
-                this.sigScanner.ScanText("40 53 48 83 EC 20 48 8B 01 48 8B D9 FF 50 18 83 F8 08 75 08");
-            PluginLog.Log($"Found IsMount address: {charaIsMountAddr.ToInt64():X}");
+
             this.charaMountedHook ??=
-                new Hook<CharacterIsMount>(charaIsMountAddr, CharacterIsMountDetour);
+                new Hook<CharacterIsMount>(Service.Address.CharacterIsMount, CharacterIsMountDetour);
             this.charaMountedHook.Enable();
-
-            var charaInitAddr = this.sigScanner.ScanText(
-                "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 48 83 EC 30 48 8B F9 48 8B EA 48 81 C1 ?? ?? ?? ?? E8 ?? ?? ?? ??");
-            PluginLog.Log($"Found Initialize address: {charaInitAddr.ToInt64():X}");
+            
             this.charaInitHook ??=
-                new Hook<CharacterInitialize>(charaInitAddr, CharacterInitializeDetour);
+                new Hook<CharacterInitialize>(Service.Address.CharacterInitialize, CharacterInitializeDetour);
             this.charaInitHook.Enable();
-
-            var flagSlotUpdateAddr =
-                this.sigScanner.ScanText(
-                    "48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 8B DA 49 8B F0 48 8B F9 83 FA 0A");
-            PluginLog.Log($"Found FlagSlotUpdate address: {flagSlotUpdateAddr.ToInt64():X}");
+            
             this.flagSlotUpdateHook ??=
-                new Hook<FlagSlotUpdate>(flagSlotUpdateAddr, FlagSlotUpdateDetour);
+                new Hook<FlagSlotUpdate>(Service.Address.FlagSlotUpdate, FlagSlotUpdateDetour);
             this.flagSlotUpdateHook.Enable();
 
             // Trigger an initial refresh of all players
@@ -152,11 +141,11 @@ namespace OopsAllLalafells
             if (lastWasPlayer)
             {
                 lastWasModified = false;
-                var actor = this.objectTable.CreateObjectReference(lastActor);
+                var actor = Service.ObjectTable.CreateObjectReference(lastActor);
                 if (actor != null &&
                     (actor.ObjectId != CHARA_WINDOW_ACTOR_ID || this.config.ImmersiveMode)
-                    && this.clientState.LocalPlayer != null
-                    && actor.ObjectId != this.clientState.LocalPlayer.ObjectId
+                    && Service.ClientState.LocalPlayer != null
+                    && actor.ObjectId != Service.ClientState.LocalPlayer.ObjectId
                     && this.config.ShouldChangeOthers)
                 {
                     this.ChangeRace(customizeDataPtr, this.config.ChangeOthersTargetRace);
@@ -274,15 +263,15 @@ namespace OopsAllLalafells
         {
             // Workaround to prevent literally genociding the actor table if we load at the same time as Dalamud + Dalamud is loading while ingame
             await Task.Delay(100); // LMFAOOOOOOOOOOOOOOOOOOO
-            var localPlayer = this.clientState.LocalPlayer;
+            var localPlayer = Service.ClientState.LocalPlayer;
             if (localPlayer == null)
             {
                 return;
             }
 
-            for (var i = 0; i < this.objectTable.Length; i++)
+            for (var i = 0; i < Service.ObjectTable.Length; i++)
             {
-                var actor = this.objectTable[i];
+                var actor = Service.ObjectTable[i];
 
                 if (actor != null
                     && actor.ObjectKind == ObjectKind.Player)
@@ -346,8 +335,8 @@ namespace OopsAllLalafells
         {
             if (!disposing) return;
 
-            this.pluginInterface.UiBuilder.OpenConfigUi -= OpenSettingsMenu;
-            this.pluginInterface.UiBuilder.Draw -= this.ui.Draw;
+            Service.Interface.UiBuilder.OpenConfigUi -= OpenSettingsMenu;
+            Service.Interface.UiBuilder.Draw -= this.ui.Draw;
             this.SaveConfig();
 
             this.charaMountedHook.Disable();
@@ -361,9 +350,7 @@ namespace OopsAllLalafells
             // Refresh all players again
             RefreshAllPlayers();
 
-            this.commandManager.RemoveHandler("/poal");
-
-            this.pluginInterface.Dispose();
+            Service.CommandManager.RemoveHandler("/poal");
         }
 
         public void Dispose()
