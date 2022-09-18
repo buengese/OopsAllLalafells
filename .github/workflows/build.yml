@@ -9,9 +9,9 @@ on:
     tags: ['v[0-9].[0-9]+.[0-9]+.[0-9]+']
 
 env:
-  SOLUTION_NAME: OopsAllLalafells
-  INTERNAL_NAME: OopsAllLalafells
-  RELEASE_DIR: bin\Release\OopsAllLalafells
+  SOLUTION_NAME: OopsAllLalafells2
+  INTERNAL_NAME: OopsAllLalafells2
+  RELEASE_DIR: bin\Release\OopsAllLalafells2
   PERSONAL_PLUGIN_REPO: buengese/DalamudPlugins
 
 jobs:

@@ -34,7 +34,7 @@ internal class PluginAddressResolver : BaseAddressResolver
 
         this.FlagSlotUpdate = scanner.ScanText("48 89 5C 24 ?? 48 89 74 24 ?? 57 48 83 EC 20 8B DA 49 8B F0 48 8B F9 83 FA 0A");
 
-        PluginLog.Verbose("===== OopsAllLalafells =====");
+        PluginLog.Verbose("===== OopsAllLalafells2 =====");
         PluginLog.Verbose($"{nameof(this.CharacterIsMount)}    0x{this.CharacterIsMount:X}");
         PluginLog.Verbose($"{nameof(this.CharacterInitialize)} 0x{this.CharacterInitialize:X}");
         PluginLog.Verbose($"{nameof(this.FlagSlotUpdate)}      0x{this.FlagSlotUpdate:X}");

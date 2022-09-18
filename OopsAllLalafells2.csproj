@@ -2,9 +2,10 @@
 
     <PropertyGroup>
         <Authors>Avaflow, buengese</Authors>
-        <Version>1.4.0.0</Version>
+        <Version>1.0.0.0</Version>
         <Description>Turn everyone around you into Lalafells (or other races)!</Description>
         <Copyright>(c) 2021 Avaflow, buengese</Copyright>
+        <RootNamespace>OopsAllLalafells</RootNamespace>
     </PropertyGroup>
 
     <PropertyGroup>
@@ -23,7 +24,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="DalamudPackager" Version="2.1.7" />
+        <PackageReference Include="DalamudPackager" Version="2.1.8" />
     </ItemGroup>
 
     <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
