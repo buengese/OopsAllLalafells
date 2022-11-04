@@ -10,7 +10,7 @@ namespace OopsAllLalafells {
 
         public int Version { get; set; } = 1;
         
-        public Race ChangeOthersTargetRace { get; set; } = Race.LALAFELL;
+        public Race ChangeOthersTargetRace { get; set; } = Race.Lalafell;
         
         public bool ShouldChangeOthers { get; set; } = false;
         

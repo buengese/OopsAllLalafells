@@ -9,34 +9,34 @@ namespace OopsAllLalafells
 {
     public class PluginUI
     {
-        private static Vector4 WHAT_THE_HELL_ARE_YOU_DOING = new Vector4(1, 0, 0, 1);
-        private readonly Plugin plugin;
-        private bool enableExperimental;
+        private static readonly Vector4 WHAT_THE_HELL_ARE_YOU_DOING = new Vector4(1, 0, 0, 1);
+        private readonly Plugin _plugin;
+        private bool _enableExperimental;
 
         // had to do it
-        private bool changeSelf;
-        private bool changeSelfLaunched;
-        private bool changeSelfShowText;
+        private bool _changeSelf;
+        private bool _changeSelfLaunched;
+        private bool _changeSelfShowText;
 
         public PluginUI(Plugin plugin)
         {
-            this.plugin = plugin;
+            this._plugin = plugin;
         }
 
         public void Draw()
         {
-            if (!this.plugin.SettingsVisible)
+            if (!this._plugin.SettingsVisible)
             {
                 return;
             }
 
-            bool settingsVisible = this.plugin.SettingsVisible;
+            bool settingsVisible = this._plugin.SettingsVisible;
             if (ImGui.Begin("Oops, All Lalafells!", ref settingsVisible, ImGuiWindowFlags.AlwaysAutoResize))
             {
-                bool shouldChangeOthers = this.plugin.config.ShouldChangeOthers;
+                bool shouldChangeOthers = this._plugin.Config.ShouldChangeOthers;
                 ImGui.Checkbox("Change other players", ref shouldChangeOthers);
 
-                Race othersTargetRace = this.plugin.config.ChangeOthersTargetRace;
+                Race othersTargetRace = this._plugin.Config.ChangeOthersTargetRace;
                 if (shouldChangeOthers)
                 {
                     if (ImGui.BeginCombo("Race", othersTargetRace.GetAttribute<Display>().Value))
@@ -61,20 +61,20 @@ namespace OopsAllLalafells
                     }
                 }
 
-                this.plugin.UpdateOtherRace(othersTargetRace);
-                this.plugin.ToggleOtherRace(shouldChangeOthers);
+                this._plugin.UpdateOtherRace(othersTargetRace);
+                this._plugin.ToggleOtherRace(shouldChangeOthers);
 
-                ImGui.Checkbox("Change self", ref this.changeSelf);
-                if (changeSelf)
+                ImGui.Checkbox("Change self", ref this._changeSelf);
+                if (_changeSelf)
                 {
-                    if (!changeSelfLaunched)
+                    if (!_changeSelfLaunched)
                     {
-                        changeSelfLaunched = true;
+                        _changeSelfLaunched = true;
                         Process.Start("explorer", "https://store.finalfantasyxiv.com/ffxivstore/en-us/product/1");
                         TriggerChangeSelfText();
                     }
 
-                    if (changeSelfShowText)
+                    if (_changeSelfShowText)
                     {
                         ImGui.TextColored(WHAT_THE_HELL_ARE_YOU_DOING,
                             "Changing your own character's race/gender is not, and will never, be\na feature of this plugin. " +
@@ -82,19 +82,19 @@ namespace OopsAllLalafells
                     }
                 }
 
-                if (enableExperimental)
+                if (_enableExperimental)
                 {
-                    bool immersiveMode = this.plugin.config.ImmersiveMode;
+                    bool immersiveMode = this._plugin.Config.ImmersiveMode;
                     ImGui.Checkbox("Immersive Mode", ref immersiveMode);
                     ImGui.Text("If Immersive Mode is enabled, \"Examine\" windows will also be modified.");
 
-                    this.plugin.UpdateImmersiveMode(immersiveMode);
+                    this._plugin.UpdateImmersiveMode(immersiveMode);
                 }
 
                 ImGui.Separator();
 
-                ImGui.Checkbox("Enable Experimental Features", ref this.enableExperimental);
-                if (enableExperimental)
+                ImGui.Checkbox("Enable Experimental Features", ref this._enableExperimental);
+                if (_enableExperimental)
                 {
                     ImGui.Text("Experimental feature configuration will (intentionally) not persist,\n" +
                                "so you will need to open this settings menu to re-activate\n" +
@@ -110,14 +110,14 @@ namespace OopsAllLalafells
                 ImGui.End();
             }
 
-            this.plugin.SettingsVisible = settingsVisible;
-            this.plugin.SaveConfig();
+            this._plugin.SettingsVisible = settingsVisible;
+            this._plugin.SaveConfig();
         }
 
         private async void TriggerChangeSelfText()
         {
             await Task.Delay(2000);
-            changeSelfShowText = true;
+            _changeSelfShowText = true;
         }
     }
 }

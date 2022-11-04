@@ -3,21 +3,21 @@ using System.Collections.Generic;
 namespace OopsAllLalafells {
 	public enum Race : byte {
         [Display("Hyur")]
-		HYUR = 1,
+		Hyur = 1,
         [Display("Elezen")]
-        ELEZEN = 2,
+        Elezen = 2,
         [Display("Lalafell")]
-        LALAFELL = 3,
+        Lalafell = 3,
         [Display("Miqo'te")]
-        MIQOTE = 4,
+        Miqote = 4,
         [Display("Roegadyn")]
-        ROEGADYN = 5,
+        Roegadyn = 5,
         [Display("Au Ra")]
-        AU_RA = 6,
+        AuRa = 6,
         [Display("Hrothgar")]
-        HROTHGAR = 7,
+        Hrothgar = 7,
         [Display("Viera")]
-        VIERA = 8
+        Viera = 8
     }
 
 	public class Display : System.Attribute {
@@ -32,14 +32,14 @@ namespace OopsAllLalafells {
 
     public class RaceMappings {
 	    public static readonly Dictionary<Race, int> RaceHairs = new Dictionary<Race, int> {
-		    { Race.HYUR, 13 },
-		    { Race.ELEZEN, 12 },
-		    { Race.LALAFELL, 13 },
-		    { Race.MIQOTE, 12 },
-		    { Race.ROEGADYN, 13 },
-		    { Race.AU_RA, 12 },
-		    { Race.HROTHGAR, 8 },
-		    { Race.VIERA, 17 },
+		    { Race.Hyur, 13 },
+		    { Race.Elezen, 12 },
+		    { Race.Lalafell, 13 },
+		    { Race.Miqote, 12 },
+		    { Race.Roegadyn, 13 },
+		    { Race.AuRa, 12 },
+		    { Race.Hrothgar, 8 },
+		    { Race.Viera, 17 },
 	    };
     }
 }
